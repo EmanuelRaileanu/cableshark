@@ -6,7 +6,16 @@ HOST = socket.gethostbyname_ex(socket.gethostname())
 # Create a raw socket and bind it to the public interface
 s = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_IP)
 
-s.bind((HOST[-1][-1], 0))
+print(HOST)
+print('Choose network interface:', HOST[-1])
+chosenHost = None
+while chosenHost is None:
+    chosenHost = input('Network interface: ')
+    if chosenHost not in HOST[-1]:
+        print('Choose a valid network interface:', HOST[-1])
+        chosenHost = None
+
+s.bind((chosenHost, 0))
 
 # Include IP headers
 s.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
