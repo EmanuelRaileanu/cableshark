@@ -4,12 +4,12 @@ import struct
 
 def ethHeader(data):
     destinationMac, sourceMac, ethProtocol = struct.unpack("!6s6sH", data)
-    data = {
+    return {
         "Protocol": ethProtocol,
         "Source mac": macFormatter(sourceMac),
         "Destination mac": macFormatter(destinationMac)
     }
-    return data
+
 
 
 # ICMP HEADER Extraction
@@ -18,12 +18,11 @@ def icmpHeader(data):
     icmp_type = icmph[0]
     code = icmph[1]
     checksum = icmph[2]
-    data = {
+    return {
         'ICMP type': icmp_type,
         "Code": code,
         "Checksum": checksum
     }
-    return data
 
 
 # UDP Header Extraction
