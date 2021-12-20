@@ -1,36 +1,71 @@
+import os
 import socket
-import struct
 
-# The public network interface
-HOST = socket.gethostbyname_ex(socket.gethostname())
-# Create a raw socket and bind it to the public interface
-s = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_IP)
+import unpack
 
-print(HOST)
-print('Choose network interface:', HOST[-1])
-chosenHost = None
-while chosenHost is None:
-    chosenHost = input('Network interface: ')
-    if chosenHost not in HOST[-1]:
-        print('Choose a valid network interface:', HOST[-1])
-        chosenHost = None
 
-s.bind((chosenHost, 0))
+def handleTCPPackets(packetSlice):
+    for key, value in unpack.tcpHeader(packetSlice).items():
+        print(key, ':', value, end=' | ')
 
-# Include IP headers
-s.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
 
-# Receive all packages
-s.ioctl(socket.SIO_RCVALL, socket.RCVALL_ON)
+def handleUDPPackets(packetSlice):
+    for key, value in unpack.udpHeader(packetSlice).items():
+        print(key, ':', value, end=' | ')
 
-# Receive a package
-while True:
-    data = s.recvfrom(65565)
-    packet = data[0]
-    header = struct.unpack('!BBHHHBBHBBBBBBBB', packet[:20])
-    if header[6] == 6:  # header[6] is the field of the Protocol
-        print("TCP", '.'.join(map(str, header[8:12])), '->', '.'.join(map(str, header[12:])))
-    elif header[6] == 17:
-        print("UDP", '.'.join(map(str, header[8:12])), '->', '.'.join(map(str, header[12:])))
-    elif header[5] == 1:
-        print("ICMP", '.'.join(map(str, header[8:12])), '->', '.'.join(map(str, header[12:])))
+
+def handleICMPPackets(packetSlice):
+    for key, value in unpack.icmpHeader(packetSlice).items():
+        print(key, ':', value, end=' | ')
+
+
+def handleHTTPPackets(packet, protocol):
+    if protocol == 6:
+        print('\n===>> [ ------------ TCP Header ----------- ] <<===')
+        handleTCPPackets(packet[20:40])
+    elif protocol == 17:
+        print('\n===>> [ ------------ UDP Header ----------- ] <<===')
+        handleUDPPackets(packet[20:28])
+    elif protocol == 1:
+        print('\n===>> [ ------------ ICMP Header ----------- ] <<===')
+        handleICMPPackets(packet[20:26])
+
+
+def main():
+    # The public network interface
+    HOST = socket.gethostbyname_ex(socket.gethostname())
+    # Create a raw socket and bind it to the public interface
+    if os.name == "nt":
+        s = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_IP)
+        print(HOST)
+        print('Choose network interface:', HOST[-1])
+        chosenNetworkInterface = HOST[-1][-1]
+        while chosenNetworkInterface is None:
+            chosenNetworkInterface = input('Network interface: ')
+            if chosenNetworkInterface not in HOST[-1]:
+                print('Choose a valid network interface:', HOST[-1])
+                chosenNetworkInterface = None
+        s.bind((chosenNetworkInterface, 0))
+        s.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
+        s.ioctl(socket.SIO_RCVALL, socket.RCVALL_ON)
+    else:
+        s = socket.socket(socket.PF_PACKET, socket.SOCK_RAW, socket.ntohs(0x0800))
+
+    while True:
+        data = s.recvfrom(65565)
+        packet = data[0]
+
+        print('\n\n===>> [ ------------ Ethernet Header----- ] <<===')
+        for key, value in unpack.ethHeader(packet[0:14]).items():
+            print(key, ':', value, end=' | ')
+
+        ipHeaderDict = unpack.ipHeader(packet[:20])
+        print('\n===>> [ ------------ IP Header ------------ ] <<===')
+        for key, value in ipHeaderDict.items():
+            print(key, ':', value, end=' | ')
+
+        handleHTTPPackets(data[0], ipHeaderDict['Protocol'])
+
+
+if __name__ == "__main__":
+    main()
