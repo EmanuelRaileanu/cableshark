@@ -14,10 +14,7 @@ def ethHeader(data):
 
 # ICMP HEADER Extraction
 def icmpHeader(data):
-    icmph = struct.unpack('!BBH', data)
-    icmpType = icmph[0]
-    code = icmph[1]
-    checksum = icmph[2]
+    icmpType, code, checksum = struct.unpack('!BBH', data)
     return {
         'ICMP type': icmpType,
         "Code": code,
