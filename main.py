@@ -285,9 +285,9 @@ def main():
 
         if 'protocol' in commandLineArguments:
             if ipHeaderDict['Protocol'] == PROTOCOL_MAPPINGS[commandLineArguments['protocol'].upper()]:
-                printInfo(packet, ipHeaderDict)
+                printInfo(data, packet, ipHeaderDict)
         else:
-            printInfo(packet, ipHeaderDict)
+            printInfo(data, packet, ipHeaderDict)
 
 
 if __name__ == "__main__":
