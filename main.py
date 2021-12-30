@@ -254,6 +254,7 @@ def printInfo(data, packet, ipHeaderDict):
     # Handle packets according to the protocol through which the packet was received
     handleHTTPPackets(data[0], ipHeaderDict['Protocol'])
 
+
 def main():
     commandLineArguments = parseCommandLineArguments()
     # The public network interface
@@ -277,7 +278,7 @@ def main():
 
     while True:
         # Receive all data
-        data = s.recvfrom(65565)
+        data = s.recvfrom(65535)
         # Get the packet
         packet = data[0]
         # Unpack the IP header

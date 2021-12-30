@@ -4,7 +4,7 @@ import struct
 
 def ethHeader(data):
     """
-    ethHeader(data) -> dictionary
+    ethHeader(data) -> dict
 
     Unpack and destructure the ETH header data
 
@@ -22,7 +22,7 @@ def ethHeader(data):
 # IP Header Extraction
 def ipHeader(data):
     """
-    ipHeader(data) -> dictionary
+    ipHeader(data) -> dict
 
     Unpack the IP header data
     Destructure the IP header data
@@ -58,7 +58,7 @@ def ipHeader(data):
 # Tcp Header Extraction
 def tcpHeader(data):
     """
-    tcpHeader(data) -> dictionary
+    tcpHeader(data) -> dict
 
     Unpack and destructure the TCP header data
 
@@ -83,7 +83,7 @@ def tcpHeader(data):
 # UDP Header Extraction
 def udpHeader(data):
     """
-    udpHeader(data) -> dictionary
+    udpHeader(data) -> dict
 
     Unpack and destructure the UDP header data
 
@@ -102,7 +102,7 @@ def udpHeader(data):
 # ICMP Header Extraction
 def icmpHeader(data):
     """
-    icmpHeader(data) -> dictionary
+    icmpHeader(data) -> dict
 
     Unpack and destructure the ICMP header data
 
