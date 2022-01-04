@@ -11,11 +11,11 @@ def ethHeader(data):
     :param data: list(list(str))
     :return: dict
     """
-    destinationMac, sourceMac, ethProtocol = struct.unpack("!6s6sH", data)
+    destinationMac, sourceMac, ethProtocol = struct.unpack('!6s6sH', data)
     return {
-        "Protocol": ethProtocol,
-        "Source mac": macFormatter(sourceMac),
-        "Destination mac": macFormatter(destinationMac)
+        'Protocol': ethProtocol,
+        'Source MAC': macFormatter(sourceMac),
+        'Destination MAC': macFormatter(destinationMac)
     }
 
 
@@ -34,7 +34,7 @@ def ipHeader(data):
     :param data: list(list(str))
     :return: dict
     """
-    unpackedData = struct.unpack("!BBHHHBBHBBBBBBBB", data)
+    unpackedData = struct.unpack('!BBHHHBBHBBBBBBBB', data)
     version, tos, totalLength, identification, fragmentOffset, ttl, protocol, headerChecksum, *_ = unpackedData
     sourceAddress = '.'.join(map(str, unpackedData[8:12]))
     sourceHost = getHost(sourceAddress)
@@ -42,15 +42,15 @@ def ipHeader(data):
     destinationHost = getHost(destinationAddress)
     return {
         'Version': version,
-        "Tos": tos,
-        "Total length": totalLength,
-        "Identification": identification,
-        "Fragment": fragmentOffset,
-        "TTL": ttl,
-        "Protocol": protocol,
-        "Header checkSum": headerChecksum,
-        "Source address": sourceAddress + ' (' + (sourceHost[0] if sourceHost != 'Unknown' else sourceHost) + ')',
-        "Destination address": destinationAddress + ' (' + (
+        'Tos': tos,
+        'Total length': totalLength,
+        'Identification': identification,
+        'Fragment': fragmentOffset,
+        'TTL': ttl,
+        'Protocol': protocol,
+        'Header checkSum': headerChecksum,
+        'Source address': sourceAddress + ' (' + (sourceHost[0] if sourceHost != 'Unknown' else sourceHost) + ')',
+        'Destination address': destinationAddress + ' (' + (
             destinationHost[0] if destinationHost != 'Unknown' else destinationHost) + ')'
     }
 
@@ -68,15 +68,15 @@ def tcpHeader(data):
     sourcePort, destinationPort, sequenceNumber, acknowledgeNumber, \
     offsetReserved, tcpFlag, window, checksum, urgentPointer = struct.unpack('!HHLLBBHHH', data)
     return {
-        "Source port": sourcePort,
-        "Destination port": destinationPort,
-        "Sequence number": sequenceNumber,
-        "Acknowledge number": acknowledgeNumber,
-        "Offset and reserved": offsetReserved,
-        "Tcp flag": tcpFlag,
-        "Window": window,
-        "Checksum": checksum,
-        "Urgent pointer": urgentPointer
+        'Source port': sourcePort,
+        'Destination port': destinationPort,
+        'Sequence number': sequenceNumber,
+        'Acknowledge number': acknowledgeNumber,
+        'Offset and reserved': offsetReserved,
+        'Tcp flag': tcpFlag,
+        'Window': window,
+        'Checksum': checksum,
+        'Urgent pointer': urgentPointer
     }
 
 
@@ -92,10 +92,10 @@ def udpHeader(data):
     """
     sourcePort, destPort, length, checksum = struct.unpack('!HHHH', data)
     return {
-        "Source port": sourcePort,
-        "Destination port": destPort,
-        "Length": length,
-        "Checksum": checksum
+        'Source port': sourcePort,
+        'Destination port': destPort,
+        'Length': length,
+        'Checksum': checksum
     }
 
 
@@ -112,8 +112,8 @@ def icmpHeader(data):
     icmpType, code, checksum = struct.unpack('!BBH', data)
     return {
         'ICMP type': icmpType,
-        "Code": code,
-        "Checksum": checksum
+        'Code': code,
+        'Checksum': checksum
     }
 
 
@@ -126,7 +126,7 @@ def macFormatter(macArray):
     :param macArray: list(str)
     :return: str
     """
-    return "%.2x:%.2x:%.2x:%.2x:%.2x:%.2x" % tuple(macArray)
+    return '%.2x:%.2x:%.2x:%.2x:%.2x:%.2x' % tuple(macArray)
 
 
 def getHost(ipAddress):

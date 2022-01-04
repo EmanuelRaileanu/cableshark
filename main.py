@@ -12,46 +12,7 @@ PROTOCOL_MAPPINGS = {
 }
 
 
-def handleTCPPackets(packetSlice):
-    """
-    handleTCPPackets(packetSlice) -> None
-
-    Unpack the TCP header and print the information
-
-    :param packetSlice: list(str)
-    :return: None
-    """
-    for key, value in unpack.tcpHeader(packetSlice).items():
-        print(key, ':', value, end=' | ')
-
-
-def handleUDPPackets(packetSlice):
-    """
-    handleUDPPackets(packetSlice) -> None
-
-    Unpack the UDP header and print the information
-
-    :param packetSlice: list(str)
-    :return: None
-    """
-    for key, value in unpack.udpHeader(packetSlice).items():
-        print(key, ':', value, end=' | ')
-
-
-def handleICMPPackets(packetSlice):
-    """
-    handleICMPPackets(packetSlice) -> None
-
-    Unpack the ICMP header and print the information
-
-    :param packetSlice: list(str)
-    :return: None
-    """
-    for key, value in unpack.icmpHeader(packetSlice).items():
-        print(key, ':', value, end=' | ')
-
-
-def handleHTTPPackets(packet, protocol):
+def unpackHTTPPackets(packet, protocol):
     """
     handleHTTPPackets(packet, protocol) -> None
 
@@ -62,14 +23,11 @@ def handleHTTPPackets(packet, protocol):
     :return: None
     """
     if protocol == PROTOCOL_MAPPINGS['TCP']:
-        print('\n===>> [ ------------ TCP Header ----------- ] <<===')
-        handleTCPPackets(packet[20:40])
+        return unpack.tcpHeader(packet[20:40])
     elif protocol == PROTOCOL_MAPPINGS['UDP']:
-        print('\n===>> [ ------------ UDP Header ----------- ] <<===')
-        handleUDPPackets(packet[20:28])
+        return unpack.udpHeader(packet[20:28])
     elif protocol == PROTOCOL_MAPPINGS['ICMP']:
-        print('\n===>> [ ------------ ICMP Header ----------- ] <<===')
-        handleICMPPackets(packet[20:26])
+        return unpack.icmpHeader(packet[20:26])
 
 
 def validateKeywords(keywords):
@@ -153,9 +111,9 @@ def validatePort(port):
         return False
 
     numericPort = int(port)
-
     if numericPort < 1 or numericPort > 65535:
         return False
+
     return True
 
 
@@ -193,9 +151,9 @@ def validateArgDict(argDict):
         sys.exit(7)
 
 
-def createArgDictionary(keywords, values):
+def createArgDict(keywords, values):
     """
-    createArgDictionary(keywords, values) -> dict
+    createArgDict(keywords, values) -> dict
 
     Create and validate the command line arguments dictionary
     Return the dictionary
@@ -229,30 +187,91 @@ def parseCommandLineArguments():
     keywords = list(map(lambda arg: arg.replace('-', ''), args[::2]))
     values = args[1::2]
     validateCommandLineArguments(keywords, values)
-    return createArgDictionary(keywords, values)
+    return createArgDict(keywords, values)
 
 
-def printInfo(data, packet, ipHeaderDict):
+def printUnpackedData(data):
+    """
+    printUnpackedData(data) -> None
+
+    Print data from dictionary
+
+    :param data: dict
+    :return: None
+    """
+    for key, value in data.items():
+        print(key, ':', value, end=' | ')
+
+
+def printProtocolSpecificHeadTitle(protocol):
+    """
+    printProtocolSpecificHeadTitle(protocol) -> None
+
+    Print protocol specific head title (TCP, UDP, ICMP)
+
+    :param protocol: int
+    :return: None
+    """
+    if protocol == PROTOCOL_MAPPINGS['TCP']:
+        print('\n===>> [ ------------ TCP Header ----------- ] <<===')
+    elif protocol == PROTOCOL_MAPPINGS['UDP']:
+        print('\n===>> [ ------------ UDP Header ----------- ] <<===')
+    elif protocol == PROTOCOL_MAPPINGS['ICMP']:
+        print('\n===>> [ ------------ ICMP Header ----------- ] <<===')
+
+
+def printInfo(packet, ipHeaderDict, protocolSpecificHeaderDict):
     """
     printInfo(data, packet, ipHeaderDict) -> None
 
     Print the gathered information
 
-    :param data: list(list(str))
     :param packet: list(str)
     :param ipHeaderDict: dict
+    :param protocolSpecificHeaderDict: dict
     :return: None
     """
     print('\n\n===>> [ ------------ Ethernet Header----- ] <<===')
-    for key, value in unpack.ethHeader(packet[0:14]).items():
-        print(key, ':', value, end=' | ')
+    printUnpackedData(unpack.ethHeader(packet[0:14]))
 
     print('\n===>> [ ------------ IP Header ------------ ] <<===')
-    for key, value in ipHeaderDict.items():
-        print(key, ':', value, end=' | ')
+    printUnpackedData(ipHeaderDict)
 
-    # Handle packets according to the protocol through which the packet was received
-    handleHTTPPackets(data[0], ipHeaderDict['Protocol'])
+    printProtocolSpecificHeadTitle(ipHeaderDict['Protocol'])
+    printUnpackedData(protocolSpecificHeaderDict)
+
+
+def filterInfo(packet, ipHeaderDict, protocolSpecificHeaderDict, clArgs):
+    """
+    filterInfo(data, packet, ipHeaderDict, commandLineArguments, protocolSpecificHeaderDict: ) -> None
+
+    Filter the sniffed data
+
+    :param packet: list(str)
+    :param ipHeaderDict: dict
+    :param clArgs: dict
+    :param protocolSpecificHeaderDict: dict
+    :return: None
+    """
+    if 'protocol' in clArgs and clArgs['protocol'].upper() == 'ICMP' and ('destport' in clArgs or 'srcport' in clArgs):
+        return
+
+    if 'protocol' in clArgs and ipHeaderDict['Protocol'] != PROTOCOL_MAPPINGS[clArgs['protocol'].upper()]:
+        return
+
+    if 'dest' in clArgs and ipHeaderDict['Destination address'].split(' ')[0] != clArgs['dest']:
+        return
+
+    if 'src' in clArgs and ipHeaderDict['Source address'].split(' ')[0] != clArgs['src']:
+        return
+
+    if 'destport' in clArgs and protocolSpecificHeaderDict['Destination port'] != int(clArgs['destport']):
+        return
+
+    if 'srcport' in clArgs and protocolSpecificHeaderDict['Source port'] != int(clArgs['srcport']):
+        return
+
+    printInfo(packet, ipHeaderDict, protocolSpecificHeaderDict)
 
 
 def main():
@@ -283,12 +302,10 @@ def main():
         packet = data[0]
         # Unpack the IP header
         ipHeaderDict = unpack.ipHeader(packet[:20])
-
-        if 'protocol' in commandLineArguments:
-            if ipHeaderDict['Protocol'] == PROTOCOL_MAPPINGS[commandLineArguments['protocol'].upper()]:
-                printInfo(data, packet, ipHeaderDict)
-        else:
-            printInfo(data, packet, ipHeaderDict)
+        # Unpack packets according to the protocol through which the packet was received
+        protocolSpecificHeaderDict = unpackHTTPPackets(data[0], ipHeaderDict['Protocol'])
+        # Filter data based on the filters parsed from the command line arguments
+        filterInfo(packet, ipHeaderDict, protocolSpecificHeaderDict, commandLineArguments)
 
 
 if __name__ == "__main__":
