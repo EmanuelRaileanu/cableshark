@@ -203,21 +203,29 @@ def printUnpackedData(data):
         print(key, ':', value, end=' | ')
 
 
-def printProtocolSpecificHeadTitle(protocol):
+def printProtocolSpecificData(protocol, data, packet):
     """
-    printProtocolSpecificHeadTitle(protocol) -> None
+    printProtocolSpecificData(protocol, data, packet) -> None
 
-    Print protocol specific head title (TCP, UDP, ICMP)
+    Print data based on the specific protocol (TCP, UDP, ICMP)
 
     :param protocol: int
-    :return: None
+    :param data: dict
+    :param packet: list(list(str))
+    :return:
     """
     if protocol == PROTOCOL_MAPPINGS['TCP']:
         print('\n===>> [ ------------ TCP Header ----------- ] <<===')
+        printUnpackedData(data)
+        print('\nPayload:', packet[40:])
     elif protocol == PROTOCOL_MAPPINGS['UDP']:
         print('\n===>> [ ------------ UDP Header ----------- ] <<===')
+        printUnpackedData(data)
+        print('\nPayload:', packet[28:])
     elif protocol == PROTOCOL_MAPPINGS['ICMP']:
         print('\n===>> [ ------------ ICMP Header ----------- ] <<===')
+        printUnpackedData(data)
+        print('\nPayload:', packet[26:])
 
 
 def printInfo(packet, ipHeaderDict, protocolSpecificHeaderDict):
@@ -237,8 +245,7 @@ def printInfo(packet, ipHeaderDict, protocolSpecificHeaderDict):
     print('\n===>> [ ------------ IP Header ------------ ] <<===')
     printUnpackedData(ipHeaderDict)
 
-    printProtocolSpecificHeadTitle(ipHeaderDict['Protocol'])
-    printUnpackedData(protocolSpecificHeaderDict)
+    printProtocolSpecificData(ipHeaderDict['Protocol'], protocolSpecificHeaderDict, packet)
 
 
 def filterInfo(packet, ipHeaderDict, protocolSpecificHeaderDict, clArgs):
@@ -281,9 +288,8 @@ def main():
     # Create a raw socket and bind it to the public interface
     if os.name == "nt":
         s = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_IP)
-        print(HOST)
         print('Choose network interface:', HOST[-1])
-        chosenNetworkInterface = HOST[-1][-1]
+        chosenNetworkInterface = None
         while chosenNetworkInterface is None:
             chosenNetworkInterface = input('Network interface: ')
             if chosenNetworkInterface not in HOST[-1]:
