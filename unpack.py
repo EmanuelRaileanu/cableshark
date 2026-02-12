@@ -1,14 +1,25 @@
 import socket
 import struct
+from typing import Dict, Tuple, Union
+
+# Header size constants (in bytes)
+ETH_HEADER_SIZE = 14
+IP_HEADER_SIZE = 20
+TCP_HEADER_SIZE = 20
+UDP_HEADER_SIZE = 8
+ICMP_HEADER_SIZE = 4
+
+# DNS cache to avoid repeated blocking lookups for the same IP
+_dns_cache: Dict[str, Union[str, Tuple]] = {}
 
 
-def ethHeader(data):
+def ethHeader(data: bytes) -> Dict[str, object]:
     """
     ethHeader(data) -> dict
 
     Unpack and destructure the ETH header data
 
-    :param data: list(list(str))
+    :param data: bytes
     :return: dict
     """
     destinationMac, sourceMac, ethProtocol = struct.unpack('!6s6sH', data)
@@ -19,8 +30,7 @@ def ethHeader(data):
     }
 
 
-# IP Header Extraction
-def ipHeader(data):
+def ipHeader(data: bytes) -> Dict[str, object]:
     """
     ipHeader(data) -> dict
 
@@ -31,7 +41,7 @@ def ipHeader(data):
     Convert the destination address to string
     Attempt to get the hostname using the destination address
 
-    :param data: list(list(str))
+    :param data: bytes
     :return: dict
     """
     unpackedData = struct.unpack('!BBHHHBBHBBBBBBBB', data)
@@ -55,14 +65,13 @@ def ipHeader(data):
     }
 
 
-# Tcp Header Extraction
-def tcpHeader(data):
+def tcpHeader(data: bytes) -> Dict[str, object]:
     """
     tcpHeader(data) -> dict
 
     Unpack and destructure the TCP header data
 
-    :param data: list(list(str))
+    :param data: bytes
     :return: dict
     """
     sourcePort, destinationPort, sequenceNumber, acknowledgeNumber, \
@@ -80,14 +89,13 @@ def tcpHeader(data):
     }
 
 
-# UDP Header Extraction
-def udpHeader(data):
+def udpHeader(data: bytes) -> Dict[str, object]:
     """
     udpHeader(data) -> dict
 
     Unpack and destructure the UDP header data
 
-    :param data: list(list(str))
+    :param data: bytes
     :return: dict
     """
     sourcePort, destPort, length, checksum = struct.unpack('!HHHH', data)
@@ -99,14 +107,13 @@ def udpHeader(data):
     }
 
 
-# ICMP Header Extraction
-def icmpHeader(data):
+def icmpHeader(data: bytes) -> Dict[str, object]:
     """
     icmpHeader(data) -> dict
 
     Unpack and destructure the ICMP header data
 
-    :param data: list(list(str))
+    :param data: bytes
     :return: dict
     """
     icmpType, code, checksum = struct.unpack('!BBH', data)
@@ -117,29 +124,35 @@ def icmpHeader(data):
     }
 
 
-def macFormatter(macArray):
+def macFormatter(macArray: bytes) -> str:
     """
     macFormatter(macArray) -> string
 
     Transform the mac address into a more common and readable format
 
-    :param macArray: list(str)
+    :param macArray: bytes
     :return: str
     """
     return '%.2x:%.2x:%.2x:%.2x:%.2x:%.2x' % tuple(macArray)
 
 
-def getHost(ipAddress):
+def getHost(ipAddress: str) -> Union[str, Tuple]:
     """
-    getHost(ipAddress) -> string
+    getHost(ipAddress) -> string or tuple
 
-    Attempt to get the hostname using the ip address
+    Attempt to get the hostname using the ip address.
+    Results are cached to avoid repeated blocking DNS lookups.
 
     :param ipAddress: str
-    :return: str
+    :return: str or tuple
     """
+    if ipAddress in _dns_cache:
+        return _dns_cache[ipAddress]
+
     try:
-        k = socket.gethostbyaddr(ipAddress)
+        result = socket.gethostbyaddr(ipAddress)
     except socket.error:
-        k = 'Unknown'
-    return k
+        result = 'Unknown'
+
+    _dns_cache[ipAddress] = result
+    return result
