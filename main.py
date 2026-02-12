@@ -1,8 +1,11 @@
 import os
 import socket
+import struct
 import sys
+from typing import Dict, List, Optional
 
 import unpack
+from unpack import ETH_HEADER_SIZE, IP_HEADER_SIZE, TCP_HEADER_SIZE, UDP_HEADER_SIZE, ICMP_HEADER_SIZE
 
 KEYWORDS = ['protocol', 'dest', 'destport', 'src', 'srcport']
 PROTOCOL_MAPPINGS = {
@@ -11,26 +14,66 @@ PROTOCOL_MAPPINGS = {
     'ICMP': 1
 }
 
+# Payload starts after IP header + protocol-specific header
+PAYLOAD_OFFSETS = {
+    'TCP': IP_HEADER_SIZE + TCP_HEADER_SIZE,   # 40
+    'UDP': IP_HEADER_SIZE + UDP_HEADER_SIZE,   # 28
+    'ICMP': IP_HEADER_SIZE + ICMP_HEADER_SIZE, # 26
+}
 
-def unpackHTTPPackets(packet, protocol):
+USAGE_TEXT = """\
+Usage: python main.py [-protocol <TCP|UDP|ICMP>] [-src <IP>] [-dest <IP>]
+                      [-srcport <1-65535>] [-destport <1-65535>]
+
+Options:
+  -protocol   Filter by protocol (TCP, UDP, or ICMP)
+  -src        Filter by source IP address
+  -dest       Filter by destination IP address
+  -srcport    Filter by source port (not valid for ICMP)
+  -destport   Filter by destination port (not valid for ICMP)
+  --help      Show this help message
+
+Examples:
+  python main.py
+  python main.py -protocol TCP
+  python main.py -protocol UDP -dest 192.168.1.1
+  python main.py -protocol TCP -src 10.0.0.1 -destport 80
+
+Note: Raw socket access requires elevated privileges (sudo/root on Linux,
+      Administrator on Windows).
+"""
+
+
+def unpackProtocolHeader(packet: bytes, protocol: int) -> Optional[Dict[str, object]]:
     """
-    handleHTTPPackets(packet, protocol) -> None
+    unpackProtocolHeader(packet, protocol) -> dict or None
 
-    Handle packets for each protocol
+    Unpack the protocol-specific header from the packet.
+    Returns None if the protocol is not recognized or the packet is too short.
 
-    :param packet: list(str)
-    :param protocol: str
-    :return: None
+    :param packet: bytes
+    :param protocol: int
+    :return: dict or None
     """
     if protocol == PROTOCOL_MAPPINGS['TCP']:
-        return unpack.tcpHeader(packet[20:40])
+        required = IP_HEADER_SIZE + TCP_HEADER_SIZE
+        if len(packet) < required:
+            return None
+        return unpack.tcpHeader(packet[IP_HEADER_SIZE:required])
     elif protocol == PROTOCOL_MAPPINGS['UDP']:
-        return unpack.udpHeader(packet[20:28])
+        required = IP_HEADER_SIZE + UDP_HEADER_SIZE
+        if len(packet) < required:
+            return None
+        return unpack.udpHeader(packet[IP_HEADER_SIZE:required])
     elif protocol == PROTOCOL_MAPPINGS['ICMP']:
-        return unpack.icmpHeader(packet[20:26])
+        required = IP_HEADER_SIZE + ICMP_HEADER_SIZE
+        if len(packet) < required:
+            return None
+        return unpack.icmpHeader(packet[IP_HEADER_SIZE:required])
+    return None
 
 
-def validateKeywords(keywords):
+def validateKeywords(keywords: List[str]) -> bool:
     """
     validateKeywords(keywords) -> boolean
 
@@ -45,7 +88,7 @@ def validateKeywords(keywords):
     return True
 
 
-def validateCommandLineArguments(keywords, values):
+def validateCommandLineArguments(keywords: List[str], values: List[str]) -> None:
     """
     validateCommandLineArguments(keywords, values) -> None
 
@@ -66,7 +109,7 @@ def validateCommandLineArguments(keywords, values):
         sys.exit(2)
 
 
-def validateProtocol(protocol):
+def validateProtocol(protocol: str) -> bool:
     """
     validateProtocol(protocol) -> boolean
 
@@ -80,7 +123,7 @@ def validateProtocol(protocol):
     return True
 
 
-def validateIpAddress(ipAddress):
+def validateIpAddress(ipAddress: str) -> bool:
     """
     validateIpAddress(ipAddress) -> boolean
 
@@ -96,7 +139,7 @@ def validateIpAddress(ipAddress):
     return True
 
 
-def validatePort(port):
+def validatePort(port: str) -> bool:
     """
     validatePort(port) -> boolean
 
@@ -117,7 +160,7 @@ def validatePort(port):
     return True
 
 
-def validateArgDict(argDict):
+def validateArgDict(argDict: Dict[str, str]) -> None:
     """
     validateArgDict(argDict) -> None
 
@@ -151,7 +194,7 @@ def validateArgDict(argDict):
         sys.exit(7)
 
 
-def createArgDict(keywords, values):
+def createArgDict(keywords: List[str], values: List[str]) -> Dict[str, str]:
     """
     createArgDict(keywords, values) -> dict
 
@@ -171,7 +214,7 @@ def createArgDict(keywords, values):
     return argDict
 
 
-def parseCommandLineArguments():
+def parseCommandLineArguments() -> Dict[str, str]:
     """
     parseCommandLineArguments() -> dict
 
@@ -184,13 +227,18 @@ def parseCommandLineArguments():
     :return: dict
     """
     args = sys.argv[1:]
+
+    if '--help' in args or '-h' in args:
+        print(USAGE_TEXT)
+        sys.exit(0)
+
     keywords = list(map(lambda arg: arg.replace('-', ''), args[::2]))
     values = args[1::2]
     validateCommandLineArguments(keywords, values)
     return createArgDict(keywords, values)
 
 
-def printUnpackedData(data):
+def printUnpackedData(data: Dict[str, object]) -> None:
     """
     printUnpackedData(data) -> None
 
@@ -203,7 +251,7 @@ def printUnpackedData(data):
         print(key, ':', value, end=' | ')
 
 
-def printProtocolSpecificData(protocol, data, packet):
+def printProtocolSpecificData(protocol: int, data: Dict[str, object], packet: bytes) -> None:
     """
     printProtocolSpecificData(protocol, data, packet) -> None
 
@@ -211,36 +259,34 @@ def printProtocolSpecificData(protocol, data, packet):
 
     :param protocol: int
     :param data: dict
-    :param packet: list(list(str))
-    :return:
+    :param packet: bytes
+    :return: None
     """
-    if protocol == PROTOCOL_MAPPINGS['TCP']:
-        print('\n===>> [ ------------ TCP Header ----------- ] <<===')
-        printUnpackedData(data)
-        print('\nPayload:', packet[40:])
-    elif protocol == PROTOCOL_MAPPINGS['UDP']:
-        print('\n===>> [ ------------ UDP Header ----------- ] <<===')
-        printUnpackedData(data)
-        print('\nPayload:', packet[28:])
-    elif protocol == PROTOCOL_MAPPINGS['ICMP']:
-        print('\n===>> [ ------------ ICMP Header ----------- ] <<===')
-        printUnpackedData(data)
-        print('\nPayload:', packet[26:])
+    protocol_names = {v: k for k, v in PROTOCOL_MAPPINGS.items()}
+    name = protocol_names.get(protocol)
+    if name is None:
+        return
+
+    print(f'\n===>> [ ------------ {name} Header ----------- ] <<===')
+    printUnpackedData(data)
+    print('\nPayload:', packet[PAYLOAD_OFFSETS[name]:])
 
 
-def printInfo(packet, ipHeaderDict, protocolSpecificHeaderDict):
+def printInfo(packet: bytes, ipHeaderDict: Dict[str, object],
+              protocolSpecificHeaderDict: Dict[str, object]) -> None:
     """
     printInfo(data, packet, ipHeaderDict) -> None
 
     Print the gathered information
 
-    :param packet: list(str)
+    :param packet: bytes
     :param ipHeaderDict: dict
     :param protocolSpecificHeaderDict: dict
     :return: None
     """
     print('\n\n===>> [ ------------ Ethernet Header----- ] <<===')
-    printUnpackedData(unpack.ethHeader(packet[0:14]))
+    if len(packet) >= ETH_HEADER_SIZE:
+        printUnpackedData(unpack.ethHeader(packet[0:ETH_HEADER_SIZE]))
 
     print('\n===>> [ ------------ IP Header ------------ ] <<===')
     printUnpackedData(ipHeaderDict)
@@ -248,13 +294,15 @@ def printInfo(packet, ipHeaderDict, protocolSpecificHeaderDict):
     printProtocolSpecificData(ipHeaderDict['Protocol'], protocolSpecificHeaderDict, packet)
 
 
-def filterInfo(packet, ipHeaderDict, protocolSpecificHeaderDict, clArgs):
+def filterInfo(packet: bytes, ipHeaderDict: Dict[str, object],
+               protocolSpecificHeaderDict: Dict[str, object],
+               clArgs: Dict[str, str]) -> None:
     """
-    filterInfo(data, packet, ipHeaderDict, commandLineArguments, protocolSpecificHeaderDict: ) -> None
+    filterInfo(data, packet, ipHeaderDict, commandLineArguments, protocolSpecificHeaderDict) -> None
 
     Filter the sniffed data
 
-    :param packet: list(str)
+    :param packet: bytes
     :param ipHeaderDict: dict
     :param clArgs: dict
     :param protocolSpecificHeaderDict: dict
@@ -281,7 +329,7 @@ def filterInfo(packet, ipHeaderDict, protocolSpecificHeaderDict, clArgs):
     printInfo(packet, ipHeaderDict, protocolSpecificHeaderDict)
 
 
-def main():
+def main() -> None:
     commandLineArguments = parseCommandLineArguments()
     # The public network interface
     HOST = socket.gethostbyname_ex(socket.gethostname())
@@ -306,10 +354,21 @@ def main():
         data = s.recvfrom(65535)
         # Get the packet
         packet = data[0]
+
+        # Validate packet length before unpacking
+        if len(packet) < IP_HEADER_SIZE:
+            continue
+
         # Unpack the IP header
-        ipHeaderDict = unpack.ipHeader(packet[:20])
-        # Unpack packets according to the protocol through which the packet was received
-        protocolSpecificHeaderDict = unpackHTTPPackets(data[0], ipHeaderDict['Protocol'])
+        ipHeaderDict = unpack.ipHeader(packet[:IP_HEADER_SIZE])
+
+        # Unpack packets according to the protocol
+        protocolSpecificHeaderDict = unpackProtocolHeader(packet, ipHeaderDict['Protocol'])
+
+        # Skip packets with unrecognized protocols or malformed headers
+        if protocolSpecificHeaderDict is None:
+            continue
+
         # Filter data based on the filters parsed from the command line arguments
         filterInfo(packet, ipHeaderDict, protocolSpecificHeaderDict, commandLineArguments)
 

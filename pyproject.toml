@@ -1,0 +1,8 @@
+[project]
+name = "cableshark"
+version = "1.0.0"
+description = "A Python network packet sniffer and analyzer"
+requires-python = ">=3.6"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
